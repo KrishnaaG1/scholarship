@@ -185,3 +185,17 @@ if st.button("Evaluate Scholarship"):
     df.to_csv("applications.csv", index=False)
 
     st.info("Application saved to applications.csv successfully.")
+
+
+st.subheader("📥 Download Applications Data")
+
+try:
+    df = pd.read_csv("applications.csv")
+    st.download_button(
+        label="Download applications.csv",
+        data=df.to_csv(index=False),
+        file_name="applications.csv",
+        mime="text/csv"
+    )
+except:
+    st.write("No applications yet.")
