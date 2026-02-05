@@ -1,27 +1,25 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from textblob import TextBlob
+import smtplib
+from email.mime.text import MIMEText
 import textstat
 
 st.set_page_config(page_title="Smart Scholarship System", layout="centered")
 
-st.title("🎓 Smart Scholarship Eligibility & Essay Evaluation System")
+st.title("🎓 Smart Scholarship Eligibility + Essay + Email Automation")
 
-# ---------------- STUDENT DETAILS ----------------
+# ================= USER INPUT =================
 
 st.header("Student Details")
 
 name = st.text_input("Student Name")
+email = st.text_input("Student Email")
 
 cgpa = st.number_input("CGPA", 0.0, 10.0, step=0.1)
-
 income = st.number_input("Annual Family Income (₹)", min_value=0)
-
 category = st.selectbox("Category", ["General", "OBC", "SC", "ST"])
-
 attendance = st.slider("Attendance (%)", 0, 100, 75)
-
 hosteller = st.selectbox("Hosteller", ["Yes", "No"])
 
 scheme = st.selectbox(
@@ -29,17 +27,14 @@ scheme = st.selectbox(
     ["Merit Based", "Merit + Means", "Need Based"]
 )
 
-# ---------------- ESSAY ----------------
-
 st.header("Scholarship Essay")
+essay = st.text_area("Paste Essay Here (minimum 150 words)", height=200)
 
-essay = st.text_area("Paste Essay Here (Minimum 150 words)", height=200)
-
-# ---------------- EVALUATION ----------------
+# ================= BUTTON =================
 
 if st.button("Evaluate Scholarship"):
 
-    # ---------- ELIGIBILITY SCORING ----------
+    # ================= ACADEMIC SCORING =================
 
     score = 0
     reasons = []
@@ -86,16 +81,10 @@ if st.button("Evaluate Scholarship"):
     else:
         threshold = 50
 
-    st.subheader("📊 Academic & Financial Evaluation")
+    st.subheader("📊 Academic Evaluation")
+    st.write(f"Academic Score: {score}/100")
 
-    st.write(f"Score: {score}/100")
-
-    if score >= threshold:
-        st.success("Academically Eligible ✅")
-    else:
-        st.error("Academically Not Eligible ❌")
-
-    # ---------- ESSAY ANALYSIS ----------
+    # ================= ESSAY ANALYSIS =================
 
     st.subheader("📝 Essay Evaluation")
 
@@ -116,21 +105,15 @@ if st.button("Evaluate Scholarship"):
     essay_score = min(essay_score, 100)
 
     st.write(f"Word Count: {word_count}")
-    st.write(f"Readability Score: {round(readability,2)}")
-    st.write(f"Keyword Relevance: {relevance}")
+    st.write(f"Readability: {round(readability,2)}")
+    st.write(f"Keyword Score: {relevance}")
     st.write(f"Essay Score: {essay_score}/100")
 
-    if essay_score >= 60:
-        st.success("Essay Quality: Good ✅")
-    else:
-        st.warning("Essay Quality: Needs Improvement ⚠")
-
-    # ---------- FINAL DECISION ----------
+    # ================= FINAL DECISION =================
 
     final_score = (score + essay_score) / 2
 
-    st.subheader("🎯 Final Scholarship Decision")
-
+    st.subheader("🎯 Final Result")
     st.write(f"Combined Score: {round(final_score,2)}")
 
     if final_score >= 65:
@@ -140,10 +123,9 @@ if st.button("Evaluate Scholarship"):
         st.error("❌ SCHOLARSHIP REJECTED")
         final_status = "Rejected"
 
-    # ---------- DOCUMENT CHECKLIST ----------
+    # ================= DOCUMENT LIST =================
 
     st.subheader("📄 Required Documents")
-
     st.write("""
     • Income Certificate  
     • CGPA Marksheet  
@@ -153,14 +135,15 @@ if st.button("Evaluate Scholarship"):
     """)
 
     if reasons:
-        st.subheader("⚠ Issues Found")
+        st.subheader("⚠ Issues")
         for r in reasons:
             st.write("•", r)
 
-    # ---------- SAVE TO CSV ----------
+    # ================= SAVE TO CSV =================
 
     record = {
         "Name": name,
+        "Email": email,
         "CGPA": cgpa,
         "Income": income,
         "Category": category,
@@ -184,18 +167,77 @@ if st.button("Evaluate Scholarship"):
 
     df.to_csv("applications.csv", index=False)
 
-    st.info("Application saved to applications.csv successfully.")
+    st.info("Application saved.")
 
+    # ================= EMAIL AUTOMATION =================
 
-st.subheader("📥 Download Applications Data")
+    sender_email = "ikrishnaa12@gmail.com"
+    sender_password = "wgvu yppq zfnl safy"
+
+    if final_status == "Approved":
+        message = f"""
+Dear {name},
+
+Congratulations! 🎉
+
+You have been APPROVED for the scholarship.
+
+Final Score: {round(final_score,2)}
+
+Please prepare the following documents:
+Income Certificate
+Marksheet
+Attendance Proof
+Aadhaar
+Bank Passbook
+
+Regards,
+Scholarship Committee
+"""
+    else:
+        message = f"""
+Dear {name},
+
+Thank you for applying.
+
+Unfortunately, you were NOT selected this time.
+
+Final Score: {round(final_score,2)}
+
+You may apply again next year.
+
+Regards,
+Scholarship Committee
+"""
+
+    try:
+        msg = MIMEText(message)
+        msg["Subject"] = "Scholarship Application Result"
+        msg["From"] = sender_email
+        msg["To"] = email
+
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, email, msg.as_string())
+        server.quit()
+
+        st.success("📧 Result email sent successfully!")
+
+    except:
+        st.warning("Email could not be sent.")
+
+# ================= CSV DOWNLOAD =================
+
+st.subheader("📥 Download Applications")
 
 try:
     df = pd.read_csv("applications.csv")
     st.download_button(
-        label="Download applications.csv",
-        data=df.to_csv(index=False),
-        file_name="applications.csv",
-        mime="text/csv"
+        "Download applications.csv",
+        df.to_csv(index=False),
+        "applications.csv",
+        "text/csv"
     )
 except:
     st.write("No applications yet.")
